@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>New Tab</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a1f;
+      --surface: rgba(255,255,255,0.05);
+      --surface-hover: rgba(255,255,255,0.09);
+      --border: rgba(255,255,255,0.08);
+      --text-primary: #f0f0f2;
+      --text-secondary: #9999aa;
+      --accent: #7b68ee;
+      --accent-dim: rgba(123,104,238,0.18);
+      --radius: 12px;
+      --radius-lg: 18px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    /* ── Background layer ── */
+    #bg-layer {
+      position: fixed; inset: 0; z-index: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transition: opacity 0.5s ease;
+    }
+    #bg-overlay {
+      position: fixed; inset: 0; z-index: 1;
+      background: linear-gradient(to bottom, rgba(10,10,14,0.55) 0%, rgba(10,10,14,0.72) 100%);
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+    body.no-bg #bg-overlay { opacity: 0; }
+
+    /* ── Layout ── */
+    #app {
+      position: relative; z-index: 2;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 24px 60px;
+    }
+
+    /* ── Clock ── */
+    #clock-wrap {
+      margin-top: 72px;
+      text-align: center;
+      user-select: none;
+    }
+    #clock {
+      font-size: clamp(52px, 7vw, 84px);
+      font-weight: 300;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: var(--text-primary);
+      text-shadow: 0 2px 24px rgba(0,0,0,0.5);
+    }
+    #clock span.ampm {
+      font-size: 0.38em;
+      font-weight: 400;
+      letter-spacing: 0;
+      vertical-align: super;
+      margin-left: 6px;
+      color: var(--text-secondary);
+    }
+    #date {
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Search bar ── */
+    #search-wrap {
+      margin-top: 44px;
+      width: 100%;
+      max-width: 580px;
+      position: relative;
+    }
+    #search-engine-btn {
+      position: absolute;
+      left: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      padding: 4px; border-radius: 6px;
+      display: flex; align-items: center; gap: 4px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+    #search-engine-btn:hover { color: var(--text-primary); }
+    #search-engine-btn img { width: 18px; height: 18px; border-radius: 4px; }
+
+    #search-bar {
+      width: 100%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 15px 52px 15px 52px;
+      font-size: 16px;
+      font-family: inherit;
+      color: var(--text-primary);
+      outline: none;
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+      backdrop-filter: blur(12px);
+    }
+    #search-bar::placeholder { color: var(--text-secondary); }
+    #search-bar:focus {
+      background: rgba(255,255,255,0.10);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    #search-submit {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--text-secondary); display: flex; align-items: center;
+      transition: color 0.2s;
+    }
+    #search-submit:hover { color: var(--accent); }
+    #search-submit svg { width: 18px; height: 18px; }
+
+    /* ── Engine dropdown ── */
+    #engine-menu {
+      display: none;
+      position: absolute;
+      left: 0; top: calc(100% + 8px);
+      background: #242430;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      z-index: 10;
+      min-width: 180px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    #engine-menu.open { display: block; }
+    .engine-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      transition: background 0.15s, color 0.15s;
+    }
+    .engine-option:hover { background: var(--surface-hover); color: var(--text-primary); }
+    .engine-option img { width: 16px; height: 16px; border-radius: 3px; }
+    .engine-option.active { color: var(--accent); }
+
+    /* ── Favorites ── */
+    #fav-section {
+      margin-top: 48px;
+      width: 100%;
+      max-width: 660px;
+    }
+    #fav-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    #fav-header h2 {
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+    #add-fav-btn {
+      background: none; border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 12px;
+      font-size: 12px; font-family: inherit;
+      color: var(--text-secondary); cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    #add-fav-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+    #fav-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+      gap: 12px;
+    }
+    .fav-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 8px; padding: 16px 8px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer; text-decoration: none;
+      transition: background 0.18s, border-color 0.18s, transform 0.18s;
+      position: relative;
+      group: true;
+    }
+    .fav-item:hover {
+      background: var(--surface-hover);
+      border-color: rgba(255,255,255,0.14);
+      transform: translateY(-2px);
+    }
+    .fav-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: #2e2e3c;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      font-size: 18px;
+    }
+    .fav-icon img { width: 100%; height: 100%; object-fit: contain; }
+    .fav-label {
+      font-size: 11px; color: var(--text-secondary);
+      text-align: center; width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .fav-remove {
+      position: absolute; top: 5px; right: 5px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: rgba(0,0,0,0.6); border: none;
+      color: #aaa; font-size: 11px; line-height: 18px;
+      text-align: center; cursor: pointer;
+      opacity: 0; transition: opacity 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fav-item:hover .fav-remove { opacity: 1; }
+    .fav-remove:hover { background: #e74c3c; color: #fff; }
+
+    /* ── Bottom bar ── */
+    #bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+      padding: 14px 24px;
+      display: flex; justify-content: flex-end; gap: 10px;
+    }
+    .bar-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 9px; padding: 7px 14px;
+      font-size: 13px; font-family: inherit;
+      color: var(--text-secondary); cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      backdrop-filter: blur(8px);
+    }
+    .bar-btn:hover { background: var(--surface-hover); color: var(--text-primary); border-color: rgba(255,255,255,0.14); }
+    .bar-btn svg { width: 14px; height: 14px; }
+
+    /* ── Modals ── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #1e1e28;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+    .modal h3 {
+      font-size: 16px; font-weight: 600; margin-bottom: 20px;
+      color: var(--text-primary);
+    }
+    .modal label {
+      display: block; font-size: 12px; color: var(--text-secondary);
+      margin-bottom: 6px; margin-top: 14px;
+    }
+    .modal input[type=text], .modal input[type=url] {
+      width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 9px;
+      padding: 11px 14px; font-size: 14px; font-family: inherit;
+      color: var(--text-primary); outline: none;
+      transition: border-color 0.2s;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-actions {
+      margin-top: 22px; display: flex; justify-content: flex-end; gap: 10px;
+    }
+    .btn-cancel {
+      background: none; border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 18px;
+      font-size: 14px; font-family: inherit;
+      color: var(--text-secondary); cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-cancel:hover { background: var(--surface); color: var(--text-primary); }
+    .btn-confirm {
+      background: var(--accent); border: none;
+      border-radius: 9px; padding: 9px 18px;
+      font-size: 14px; font-family: inherit;
+      color: #fff; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-confirm:hover { opacity: 0.85; }
+
+    /* ── BG Picker modal ── */
+    #bg-modal .bg-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      margin-top: 4px;
+    }
+    .bg-swatch {
+      height: 72px; border-radius: 10px; cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.2s, transform 0.15s;
+      background-size: cover; background-position: center;
+      overflow: hidden; position: relative;
+    }
+    .bg-swatch:hover { transform: scale(1.03); }
+    .bg-swatch.selected { border-color: var(--accent); }
+    .bg-swatch .swatch-label {
+      position: absolute; bottom: 4px; left: 0; right: 0;
+      text-align: center; font-size: 10px; color: rgba(255,255,255,0.75);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    }
+    #bg-upload-label {
+      margin-top: 16px; display: block;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 10px; padding: 14px;
+      text-align: center; cursor: pointer;
+      font-size: 13px; color: var(--text-secondary);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    #bg-upload-label:hover { border-color: var(--accent); color: var(--accent); }
+    #bg-upload { display: none; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+  </style>
+</head>
+<body>
+  <div id="bg-layer"></div>
+  <div id="bg-overlay"></div>
+
+  <div id="app">
+    <!-- Clock -->
+    <div id="clock-wrap">
+      <div id="clock">12:00<span class="ampm">AM</span></div>
+      <div id="date">Monday, January 1</div>
+    </div>
+
+    <!-- Search -->
+    <div id="search-wrap">
+      <button id="search-engine-btn" title="Change search engine">
+        <img id="engine-icon" src="" alt="" />
+      </button>
+      <input id="search-bar" type="text" placeholder="Search the web or enter a URL" autocomplete="off" spellcheck="false" />
+      <button id="search-submit" title="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </button>
+      <div id="engine-menu">
+        <div class="engine-option active" data-engine="google">
+          <img src="https://www.google.com/favicon.ico" alt="" /> Google
+        </div>
+        <div class="engine-option" data-engine="duckduckgo">
+          <img src="https://duckduckgo.com/favicon.ico" alt="" /> DuckDuckGo
+        </div>
+        <div class="engine-option" data-engine="bing">
+          <img src="https://www.bing.com/favicon.ico" alt="" /> Bing
+        </div>
+        <div class="engine-option" data-engine="brave">
+          <img src="https://brave.com/favicon.ico" alt="" /> Brave Search
+        </div>
+        <div class="engine-option" data-engine="startpage">
+          <img src="https://www.startpage.com/favicon.ico" alt="" /> Startpage
+        </div>
+      </div>
+    </div>
+
+    <!-- Favorites -->
+    <div id="fav-section">
+      <div id="fav-header">
+        <h2>Favourites</h2>
+        <button id="add-fav-btn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add
+        </button>
+      </div>
+      <div id="fav-grid"></div>
+    </div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div id="bottom-bar">
+    <button class="bar-btn" id="bg-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="m8 21 4-4 4 4"/><path d="m2 10 6-3 4 2 4-3 6 3"/>
+      </svg>
+      Background
+    </button>
+  </div>
+
+  <!-- Add Favourite Modal -->
+  <div class="modal-backdrop" id="fav-modal">
+    <div class="modal">
+      <h3>Add Favourite</h3>
+      <label>Name</label>
+      <input type="text" id="fav-name" placeholder="e.g. YouTube" />
+      <label>URL</label>
+      <input type="url" id="fav-url" placeholder="https://youtube.com" />
+      <div class="modal-actions">
+        <button class="btn-cancel" id="fav-cancel">Cancel</button>
+        <button class="btn-confirm" id="fav-save">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BG Picker Modal -->
+  <div class="modal-backdrop" id="bg-modal">
+    <div class="modal">
+      <h3>Choose Background</h3>
+      <div class="bg-grid" id="bg-grid"></div>
+      <label id="bg-upload-label">
+        📁 Upload your own image
+        <input type="file" id="bg-upload" accept="image/*" />
+      </label>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="bg-cancel">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ── Data ── */
+const ENGINES = {
+  google:     { name: 'Google',     url: 'https://www.google.com/search?q=', icon: 'https://www.google.com/favicon.ico' },
+  duckduckgo: { name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=',       icon: 'https://duckduckgo.com/favicon.ico' },
+  bing:       { name: 'Bing',       url: 'https://www.bing.com/search?q=',   icon: 'https://www.bing.com/favicon.ico' },
+  brave:      { name: 'Brave',      url: 'https://search.brave.com/search?q=',icon: 'https://brave.com/favicon.ico' },
+  startpage:  { name: 'Startpage',  url: 'https://www.startpage.com/search?q=', icon: 'https://www.startpage.com/favicon.ico' },
+};
+
+const BG_PRESETS = [
+  { id: 'none',     label: 'Dark (default)', css: '', gradient: 'linear-gradient(135deg,#1a1a1f 0%,#12121a 100%)' },
+  { id: 'aurora',   label: 'Aurora',         gradient: 'linear-gradient(135deg,#0d1117 0%,#0a2a3a 40%,#0d3328 70%,#1a0a2e 100%)' },
+  { id: 'dusk',     label: 'Dusk',           gradient: 'linear-gradient(135deg,#1a0a14 0%,#2d1b3d 50%,#0d2040 100%)' },
+  { id: 'midnight', label: 'Midnight',       gradient: 'linear-gradient(160deg,#080c14 0%,#0f1a2e 50%,#141028 100%)' },
+  { id: 'ember',    label: 'Ember',          gradient: 'linear-gradient(135deg,#1a0a00 0%,#2d1200 50%,#180018 100%)' },
+  { id: 'forest',   label: 'Forest',         gradient: 'linear-gradient(135deg,#071210 0%,#0d2118 50%,#0a1a10 100%)' },
+];
+
+const DEFAULT_FAVS = [
+  { name: 'YouTube',  url: 'https://youtube.com',  icon: 'https://www.youtube.com/favicon.ico' },
+  { name: 'GitHub',   url: 'https://github.com',   icon: 'https://github.com/favicon.ico' },
+  { name: 'Reddit',   url: 'https://reddit.com',   icon: 'https://www.reddit.com/favicon.ico' },
+  { name: 'Spotify',  url: 'https://open.spotify.com', icon: 'https://open.spotify.com/favicon.ico' },
+  { name: 'Twitch',   url: 'https://twitch.tv',    icon: 'https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c1.png' },
+  { name: 'Gmail',    url: 'https://mail.google.com', icon: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico' },
+];
+
+/* ── State ── */
+let engine  = localStorage.getItem('zen_engine') || 'google';
+let favs    = JSON.parse(localStorage.getItem('zen_favs') || 'null') || DEFAULT_FAVS;
+let bgId    = localStorage.getItem('zen_bg') || 'none';
+let bgCustom = localStorage.getItem('zen_bg_custom') || '';
+
+/* ── Clock ── */
+const clockEl = document.getElementById('clock');
+const dateEl  = document.getElementById('date');
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function tick() {
+  const now = new Date();
+  let h = now.getHours(), m = now.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const mm = String(m).padStart(2,'0');
+  clockEl.innerHTML = `${h}:${mm}<span class="ampm">${ampm}</span>`;
+  dateEl.textContent = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
+}
+tick();
+setInterval(tick, 1000);
+
+/* ── Engine ── */
+const engineIcon = document.getElementById('engine-icon');
+const engineMenu = document.getElementById('engine-menu');
+
+function setEngine(id) {
+  engine = id;
+  localStorage.setItem('zen_engine', id);
+  engineIcon.src = ENGINES[id].icon;
+  engineIcon.alt = ENGINES[id].name;
+  document.querySelectorAll('.engine-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.engine === id);
+  });
+}
+setEngine(engine);
+
+document.getElementById('search-engine-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  engineMenu.classList.toggle('open');
+});
+document.querySelectorAll('.engine-option').forEach(el => {
+  el.addEventListener('click', () => {
+    setEngine(el.dataset.engine);
+    engineMenu.classList.remove('open');
+  });
+});
+document.addEventListener('click', () => engineMenu.classList.remove('open'));
+
+/* ── Search ── */
+const searchBar = document.getElementById('search-bar');
+function doSearch() {
+  const q = searchBar.value.trim();
+  if (!q) return;
+  const isURL = /^(https?:\/\/|www\.)/i.test(q) || /^[a-z0-9-]+\.[a-z]{2,}$/i.test(q);
+  window.location.href = isURL ? (q.startsWith('http') ? q : 'https://' + q) : ENGINES[engine].url + encodeURIComponent(q);
+}
+searchBar.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('search-submit').addEventListener('click', doSearch);
+
+/* ── Favourites ── */
+function getFavicon(url) {
+  try {
+    const host = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
+  } catch { return ''; }
+}
+
+function renderFavs() {
+  const grid = document.getElementById('fav-grid');
+  grid.innerHTML = '';
+  favs.forEach((fav, i) => {
+    const a = document.createElement('a');
+    a.className = 'fav-item';
+    a.href = fav.url;
+    a.title = fav.name;
+    const iconSrc = fav.icon || getFavicon(fav.url);
+    a.innerHTML = `
+      <div class="fav-icon"><img src="${iconSrc}" alt="" onerror="this.style.display='none';this.parentNode.textContent='${fav.name[0].toUpperCase()}'" /></div>
+      <span class="fav-label">${fav.name}</span>
+      <button class="fav-remove" title="Remove" data-i="${i}">✕</button>
+    `;
+    a.querySelector('.fav-remove').addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      favs.splice(i, 1);
+      saveFavs(); renderFavs();
+    });
+    grid.appendChild(a);
+  });
+}
+
+function saveFavs() { localStorage.setItem('zen_favs', JSON.stringify(favs)); }
+renderFavs();
+
+/* Add fav modal */
+const favModal  = document.getElementById('fav-modal');
+const favName   = document.getElementById('fav-name');
+const favUrl    = document.getElementById('fav-url');
+document.getElementById('add-fav-btn').addEventListener('click', () => {
+  favName.value = ''; favUrl.value = '';
+  favModal.classList.add('open');
+  setTimeout(() => favName.focus(), 80);
+});
+document.getElementById('fav-cancel').addEventListener('click', () => favModal.classList.remove('open'));
+favModal.addEventListener('click', e => { if (e.target === favModal) favModal.classList.remove('open'); });
+document.getElementById('fav-save').addEventListener('click', () => {
+  const name = favName.value.trim();
+  const url  = favUrl.value.trim();
+  if (!name || !url) return;
+  const fullUrl = url.startsWith('http') ? url : 'https://' + url;
+  favs.push({ name, url: fullUrl, icon: getFavicon(fullUrl) });
+  saveFavs(); renderFavs();
+  favModal.classList.remove('open');
+});
+[favName, favUrl].forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('fav-save').click(); }));
+
+/* ── Background ── */
+const bgLayer   = document.getElementById('bg-layer');
+const bgOverlay = document.getElementById('bg-overlay');
+
+function applyBg() {
+  if (bgId === 'custom' && bgCustom) {
+    bgLayer.style.backgroundImage = `url(${bgCustom})`;
+    bgLayer.style.background = '';
+    document.body.classList.remove('no-bg');
+  } else {
+    const preset = BG_PRESETS.find(p => p.id === bgId) || BG_PRESETS[0];
+    if (preset.css) {
+      bgLayer.style.backgroundImage = `url(${preset.css})`;
+    } else {
+      bgLayer.style.background = preset.gradient;
+      bgLayer.style.backgroundImage = '';
+    }
+    if (bgId === 'none') document.body.classList.add('no-bg');
+    else document.body.classList.remove('no-bg');
+  }
+  document.querySelectorAll('.bg-swatch').forEach(sw => {
+    sw.classList.toggle('selected', sw.dataset.id === bgId);
+  });
+}
+
+function buildBgGrid() {
+  const grid = document.getElementById('bg-grid');
+  grid.innerHTML = '';
+  BG_PRESETS.forEach(p => {
+    const sw = document.createElement('div');
+    sw.className = 'bg-swatch' + (p.id === bgId ? ' selected' : '');
+    sw.dataset.id = p.id;
+    sw.style.background = p.gradient || '#1a1a1f';
+    sw.innerHTML = `<span class="swatch-label">${p.label}</span>`;
+    sw.addEventListener('click', () => {
+      bgId = p.id;
+      localStorage.setItem('zen_bg', bgId);
+      applyBg();
+    });
+    grid.appendChild(sw);
+  });
+  // Add custom swatch if exists
+  if (bgCustom) {
+    const sw = document.createElement('div');
+    sw.className = 'bg-swatch' + (bgId === 'custom' ? ' selected' : '');
+    sw.dataset.id = 'custom';
+    sw.style.backgroundImage = `url(${bgCustom})`;
+    sw.innerHTML = `<span class="swatch-label">Custom</span>`;
+    sw.addEventListener('click', () => { bgId = 'custom'; localStorage.setItem('zen_bg', bgId); applyBg(); buildBgGrid(); });
+    grid.appendChild(sw);
+  }
+}
+
+const bgModal = document.getElementById('bg-modal');
+document.getElementById('bg-btn').addEventListener('click', () => { buildBgGrid(); bgModal.classList.add('open'); });
+document.getElementById('bg-cancel').addEventListener('click', () => bgModal.classList.remove('open'));
+bgModal.addEventListener('click', e => { if (e.target === bgModal) bgModal.classList.remove('open'); });
+
+document.getElementById('bg-upload').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    bgCustom = ev.target.result;
+    localStorage.setItem('zen_bg_custom', bgCustom);
+    bgId = 'custom';
+    localStorage.setItem('zen_bg', bgId);
+    applyBg(); buildBgGrid();
+  };
+  reader.readAsDataURL(file);
+});
+
+applyBg();
+</script>
+</body>
+</html>
